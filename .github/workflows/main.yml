@@ -1,0 +1,25 @@
+name: Build VyOS LTS
+
+on:
+  push:
+  schedule:
+    - cron: '0 0 1 * *'  # Run build every month
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Build vyos-build docker image
+      run: |
+        git clone -b crux --single-branch https://github.com/vyos/vyos-build.git
+        cd vyos-build
+        docker build -t vyos-builder docker
+    - name: Build iso
+      run: |
+        docker run --rm --privileged -v $(pwd)/vyos-build:/vyos -w /vyos vyos-builder bash -c './configure --architecture amd64 --build-type release && sudo make iso'
+    - name: Persist created iso
+      uses: actions/upload-artifact@v1
+      with:
+        name: vyos-lts
+        path: 'vyos-build/build/live-image-amd64.hybrid.iso'
