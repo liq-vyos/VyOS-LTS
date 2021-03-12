@@ -12,7 +12,7 @@ jobs:
     steps:
     - name: Build vyos-build docker image
       run: |
-        git clone -b crux --single-branch https://github.com/vyos/vyos-build.git
+        git clone -b current --single-branch https://github.com/vyos/vyos-build.git
         cd vyos-build
         docker build -t vyos-builder docker
     - name: Build iso
