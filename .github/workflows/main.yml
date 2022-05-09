@@ -1,5 +1,14 @@
 name: Build VyOS LTS
 
+env:
+  REPO_URL: https://github.com/vyos/vyos-build
+  REPO_GIT: https://github.com/vyos/vyos-build.git
+  UPLOAD_BIN_DIR: true
+  UPLOAD_FIRMWARE: true
+  UPLOAD_COWTRANSFER: false
+  UPLOAD_WETRANSFER: false
+  UPLOAD_RELEASE: true
+  
 on:
   push:
   schedule:
@@ -15,11 +24,56 @@ jobs:
         git clone -b current --single-branch https://github.com/vyos/vyos-build.git
         cd vyos-build
         docker build -t vyos-builder docker
+ 
     - name: Build iso
+      id: build-iso
       run: |
         docker run --rm --privileged -v $(pwd)/vyos-build:/vyos -w /vyos vyos-builder bash -c './configure --architecture amd64 --build-type release && sudo make iso'
+        echo "::set-output name=status::success"
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+ 
+    - name: Check space usage
+      if: (!cancelled())
+      run: df -hT
+ 
     - name: Persist created iso
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@main
+      if: steps.build-iso.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
-        name: vyos-lts
+        name: vyos-lts_${{ env.FILE_DATE }}
         path: 'vyos-build/build/live-image-amd64.hybrid.iso'
+
+    - name: Generate release tag
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      run: |
+        echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
+        touch release.txt
+        [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
+        [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
+        echo "::set-output name=status::success"
+
+    - name: Upload firmware to release
+      uses: softprops/action-gh-release@v1
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        body_path: release.txt
+        files: vyos-build/build/*
+
+    - name: Delete workflow runs
+      uses: GitRML/delete-workflow-runs@main
+      with:
+        retain_days: 1
+        keep_minimum_runs: 3
+
+    - name: Remove old Releases
+      uses: dev-drprasad/delete-older-releases@v0.1.0
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      with:
+        keep_latest: 3
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   
