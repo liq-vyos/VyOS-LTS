@@ -3,7 +3,7 @@ name: Build VyOS LTS
 on:
   push:
   schedule:
-    - cron: '0 0 * * *'  # Run build every day
+    - cron: '0 0 * * 0'  # Run build every week
 
 jobs:
   build:
