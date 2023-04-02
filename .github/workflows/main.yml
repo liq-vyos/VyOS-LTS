@@ -24,12 +24,11 @@ jobs:
         git clone -b current --single-branch https://github.com/vyos/vyos-build.git
         cd vyos-build
         docker build -t vyos-builder docker
-        echo "Current dir: $PWD"
  
     - name: Build iso
       id: build-iso
       run: |
-        echo "Current dir: $PWD"
+        cd vyos-build
         docker run --rm --privileged -v $(pwd)/vyos-build:/vyos -w /vyos vyos-builder bash -c './configure --architecture amd64 --build-type release && sudo make iso'
         echo "::set-output name=status::success"
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
