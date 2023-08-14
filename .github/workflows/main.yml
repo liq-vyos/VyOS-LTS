@@ -8,6 +8,8 @@ env:
   UPLOAD_COWTRANSFER: false
   UPLOAD_WETRANSFER: false
   UPLOAD_RELEASE: true
+  DELETE_OLD_WORKFLOWS: true
+  DELETE_OLD_RELEASES: true
   
 on:
   push:
@@ -28,7 +30,7 @@ jobs:
     - name: Build iso
       id: build-iso
       run: |
-        cd vyos-build
+        [ "$(basename "$PWD")" != "vyos-build" ] && cd vyos-build
         docker run --rm --privileged -v $(pwd)/vyos-build:/vyos -w /vyos vyos-builder bash -c './configure --architecture amd64 --build-type release && sudo make iso'
         echo "::set-output name=status::success"
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
@@ -39,7 +41,7 @@ jobs:
  
     - name: Persist created iso
       uses: actions/upload-artifact@main
-      if: steps.build-iso.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      if: (!cancelled()) && steps.build-iso.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: vyos-lts_${{ env.FILE_DATE }}
         path: 'vyos-build/build/live-image-amd64.hybrid.iso'
@@ -56,7 +58,7 @@ jobs:
 
     - name: Upload firmware to release
       uses: softprops/action-gh-release@v1
-      if: steps.tag.outputs.status == 'success' && !cancelled()
+      if: steps.tag.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -66,13 +68,14 @@ jobs:
 
     - name: Delete workflow runs
       uses: GitRML/delete-workflow-runs@main
+      if: env.DELETE_OLD_WORKFLOWS == 'true' && !cancelled()
       with:
         retain_days: 1
         keep_minimum_runs: 3
 
     - name: Remove old Releases
       uses: dev-drprasad/delete-older-releases@v0.1.0
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: env.DELETE_OLD_RELEASES == 'true' && !cancelled()
       with:
         keep_latest: 3
         delete_tags: true
