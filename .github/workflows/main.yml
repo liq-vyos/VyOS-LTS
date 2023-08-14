@@ -55,7 +55,7 @@ jobs:
 
     - name: Generate release tag
       id: tag
-      if: !cancelled() && steps.build-iso.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true'
+      if: (!cancelled()) && steps.build-iso.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true'
       run: |
         #echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
         echo "release_tag=_$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_ENV
@@ -66,7 +66,7 @@ jobs:
 
     - name: Upload firmware to release
       uses: softprops/action-gh-release@v1
-      if: !cancelled() && steps.tag.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true'
+      if: (!cancelled()) && steps.tag.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
