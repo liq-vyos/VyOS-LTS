@@ -33,10 +33,11 @@ jobs:
       id: build-iso
       if: (!cancelled()) && steps.build-docker.outputs.status == 'success'
       run: |
+        ls -al; pwd
         [ "$(basename "$PWD")" != "vyos-build" ] && cd vyos-build
         ls -al; pwd
-        docker run --rm --privileged -v $(pwd)/vyos-build:/vyos -w /vyos vyos-builder bash -c './configure --architecture amd64 --build-type release && sudo make iso'
-        #echo "::set-output name=status::success"
+        #docker run --rm --privileged -v $(pwd):/vyos -w /vyos vyos/vyos-build:current bash
+        docker run --rm --privileged -v $(pwd)/vyos-build:/vyos -w /vyos vyos-builder bash -c 'os=buster64 branch=current make build && ./configure --architecture amd64 --build-type release && sudo make iso'
         echo "status=success" >>$GITHUB_OUTPUT
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >>$GITHUB_ENV
  
