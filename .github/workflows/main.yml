@@ -37,7 +37,7 @@ jobs:
         # docker run --rm --privileged -v $(pwd):/vyos -w /vyos vyos/vyos-build:current bash
         # For VyOS 1.4 (sagitta)  $ os=buster64 branch=sagitta make build
         #docker run --rm --privileged -v $(pwd)/vyos-build:/vyos -w /vyos vyos-builder bash -c 'os=buster64 branch=sagitta make build && ./configure --architecture amd64 --build-type release && sudo make iso'
-        docker run --rm --privileged -v $(pwd):/vyos -w /vyos vyos/vyos-build:current bash -c 'ls -al && grep : Makefile | awk -F: '/^[^.]/ {print $1;}' && os=buster64 branch=current make build && ./configure --architecture amd64 --build-type release && sudo make iso'
+        docker run --rm --privileged -v $(pwd):/vyos -w /vyos vyos/vyos-build:current bash -c 'os=buster64 branch=current make build && ./configure --architecture amd64 --build-type release && sudo make iso'
         echo "status=success" >>$GITHUB_OUTPUT
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >>$GITHUB_ENV
  
