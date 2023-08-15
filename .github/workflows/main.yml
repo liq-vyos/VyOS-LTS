@@ -8,6 +8,7 @@ env:
   UPLOAD_COWTRANSFER: false
   UPLOAD_WETRANSFER: false
   UPLOAD_RELEASE: true
+  TEST_UPLOAD_RELEASE: true
   DELETE_OLD_WORKFLOWS: true
   DELETE_OLD_RELEASES: true
   
@@ -21,7 +22,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Generate test release tag
+      id: test-tag
+      if: env.TEST_UPLOAD_RELEASE == 'true'
+      run: |
+        echo "test_release_tag=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
+        #echo "RELEASE_TAG=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
+        touch release.txt
+        [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
+        [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
+
     - name: Build vyos-build docker image
+      if: (!cancelled()) && steps.test-tag.conclusion == 'success'
       id: build-docker
       run: |
         git clone -b current --single-branch https://github.com/vyos/vyos-build.git
@@ -59,8 +71,7 @@ jobs:
       id: tag
       if: (!cancelled()) && steps.persist-iso.conclusion == 'success' && env.UPLOAD_RELEASE == 'true'
       run: |
-        echo "release_tag=_$(date +%Y.%m.%d-%H%M)" >>"$GITHUB_OUTPUT"
-        #echo "RELEASE_TAG=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
+        echo "test_release_tag=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
         echo $GITHUB_OUTPUT
         touch release.txt
         [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
