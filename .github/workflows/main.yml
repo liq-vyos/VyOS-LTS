@@ -62,7 +62,9 @@ jobs:
       id: tag
       if: (!cancelled()) && steps.persist-iso.conclusion == 'success' && env.UPLOAD_RELEASE == 'true'
       run: >
-          echo "release_tag=_$(date +%Y.%m.%d-%H%M)" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_TAG=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_ENV
+
+          #echo "release_tag=_$(date +%Y.%m.%d-%H%M)" >> "$GITHUB_OUTPUT"
 
           touch release.txt
 
@@ -77,7 +79,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
+        # tag_name: ${{ steps.tag.outputs.release_tag }}
+        tag_name: ${{ env.RELEASE_TAG }}
         body_path: release.txt
         files: vyos-build/build/*
 
