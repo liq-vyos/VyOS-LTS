@@ -26,9 +26,9 @@ jobs:
       id: test-tag
       if: env.TEST_UPLOAD_RELEASE == 'true'
       run: |
-        echo "test_release_tag=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
-        #echo "RELEASE_TAG=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
+        echo "test_release_tag=_$(date +%Y.%m.%d-%H%M)" >>"$GITHUB_OUTPUT"
         touch release.txt
+        echo release.txt
         [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
         [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
 
