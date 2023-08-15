@@ -59,11 +59,11 @@ jobs:
       id: tag
       if: (!cancelled()) && steps.persist-iso.conclusion == 'success' && env.UPLOAD_RELEASE == 'true'
       run: |
-        echo "release_tag=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
+        echo "release_tag=_$(date +'%Y.%m.%d-%H%M')" >>$GITHUB_OUTPUT
+        #echo "release_tag=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
         touch release.txt
         [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
         [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-        #echo "status=success" >>$GITHUB_OUTPUT
 
     - name: Upload firmware to release
       id: upload-release
