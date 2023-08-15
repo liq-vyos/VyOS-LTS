@@ -44,7 +44,11 @@ jobs:
     - name: Check space usage
       id: check-usage
       if: (!cancelled()) && steps.build-iso.conclusion == 'success'
-      run: pwd; ls -al; df -hT; #echo "status=success" >>$GITHUB_OUTPUT
+      run: |
+        pwd; ls -al
+        df -hT
+        echo "ACTIONS_RUNNER_DEBUG=true" >> "$GITHUB_ENV"
+        echo "ACTIONS_STEP_DEBUG=true" >> "$GITHUB_ENV"
  
     - name: Persist created iso
       id: persist-iso
