@@ -30,7 +30,7 @@ jobs:
  
     - name: Build iso
       id: build-iso
-      if: (!cancelled()) && steps.build-docker.conclusion == 'success'
+      if: steps.build-docker.conclusion == 'success' && !cancelled()
       run: |
         [ "$(basename "$PWD")" != "vyos-build" ] && cd vyos-build
         # docker run --rm --privileged -v $(pwd):/vyos -w /vyos vyos/vyos-build:current bash
@@ -43,7 +43,7 @@ jobs:
  
     - name: Check space usage
       id: check-usage
-      if: (!cancelled()) && steps.build-iso.conclusion == 'success'
+      if: steps.build-iso.conclusion == 'success' && (!cancelled())
       run: |
         pwd; ls -al
         df -hT
@@ -53,16 +53,16 @@ jobs:
     - name: Persist created iso
       id: persist-iso
       uses: actions/upload-artifact@main
-      if: (!cancelled()) && steps.check-usage.conclusion == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      if: steps.check-usage.conclusion == 'success' && env.UPLOAD_BIN_DIR == 'true' && !cancelled()
       with:
         name: vyos-lts_${{ env.FILE_DATE }}
         path: 'vyos-build/build/live-image-amd64.hybrid.iso'
 
     - name: Generate release tag
       id: tag
-      if: (!cancelled()) && steps.persist-iso.conclusion == 'success' && env.UPLOAD_RELEASE == 'true'
+      if: steps.persist-iso.conclusion == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: >
-          echo "RELEASE_TAG=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_ENV
+          echo "RELEASE_TAG=_$(date +"%Y.%m.%d-%H%M")" >> "$GITHUB_ENV"
 
           #echo "release_tag=_$(date +%Y.%m.%d-%H%M)" >> "$GITHUB_OUTPUT"
 
