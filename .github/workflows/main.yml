@@ -59,7 +59,8 @@ jobs:
       id: tag
       if: (!cancelled()) && steps.persist-iso.conclusion == 'success' && env.UPLOAD_RELEASE == 'true'
       run: |
-        echo "release_tag=_$(date +%Y.%m.%d-%H%M)" >> "$GITHUB_OUTPUT"
+        echo "release_tag=_$(date +%Y.%m.%d-%H%M)" >>"$GITHUB_OUTPUT"
+        #echo "RELEASE_TAG=_$(date +"%Y.%m.%d-%H%M")" >>$GITHUB_OUTPUT
         echo $GITHUB_OUTPUT
         touch release.txt
         [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
