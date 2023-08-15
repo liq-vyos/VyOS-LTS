@@ -22,13 +22,11 @@ jobs:
 
     steps:
     - name: Build vyos-build docker image
-      if: (!cancelled()) && steps.test-tag.conclusion == 'success'
       id: build-docker
       run: |
         git clone -b current --single-branch https://github.com/vyos/vyos-build.git
         cd vyos-build
         docker build -t vyos-builder docker
-        #echo "status=success" >>$GITHUB_OUTPUT
  
     - name: Build iso
       id: build-iso
