@@ -9,134 +9,106 @@ env:
   UPLOAD_WETRANSFER: false
   UPLOAD_RELEASE: true
   AUTHOR_NAME: ${{ github.event.head_commit.author.name }}
-AUTHOR_EMAIL: ${{ github.event.head_commit.author.email }}
+  AUTHOR_EMAIL: ${{ github.event.head_commit.author.email }}
   DELETE_OLD_WORKFLOWS: true
   DELETE_OLD_RELEASES: true
-  
+
 on:
   push:
   schedule:
-    - cron: '0 0 * * 0'  # Run build every week
+    - cron: '0 0 * * 0' # Run build every week
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Build vyos-build docker image
-      id: vyos-build
-      id: build-docker
-      run: |
-        git clone -b current --single-branch https://github.com/vyos/vyos-build.git
-        cd vyos-build
-        docker build -t vyos-builder docker
-        echo "::set-output name=status::success"
+      - name: Check out repository
+        uses: actions/checkout@v3
 
-    - name: Build iso
-      id: build-iso
-      if: steps.vyos-build.outputs.status == 'success' && !cancelled()
-      if: steps.build-docker.conclusion == 'success' && !cancelled()
-      run: |
-        [ "$(basename "$PWD")" != "vyos-build" ] && cd vyos-build
-        # docker run --rm --privileged -v $(pwd):/vyos -w /vyos vyos/vyos-build:current bash
-        # For VyOS 1.4 (sagitta)  $ os=buster64 branch=sagitta make build
-        #docker run --rm --privileged -v $(pwd)/vyos-build:/vyos -w /vyos vyos-builder bash -c 'os=buster64 branch=sagitta make build && ./configure --architecture amd64 --build-type release && sudo make iso'
-        #docker run --rm --privileged -v $(pwd):/vyos -w /vyos vyos/vyos-build:current bash -c 'os=buster64 branch=current make build && ./configure --architecture amd64 --build-type release && sudo make iso'
-        docker run --rm --privileged -v $(pwd):/vyos -w /vyos vyos/vyos-build:current bash -c 'os=buster64 branch=current sudo make iso'
-        #echo "status=success" >>$GITHUB_OUTPUT
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >>$GITHUB_ENV
- 
-    - name: Check space usage
-      if: steps.build-iso.outputs.status == 'success' && (!cancelled())
-      run: df -hT
-      
-    - name: Delete artifacts from previous runs
-      id: delete-artifacts
-      uses: actions/github-script@v3
-      if: steps.build-iso.outputs.status == 'success' && (!cancelled())
-      with:
-        github-token: ${{ github.token }}
-        script: |
-          const runsResponse = await github.request("GET /repos/${{ github.repository }}/actions/runs")
-          for (workflow_run of runsResponse.data.workflow_runs) {
-            if (workflow_run.name == "${{ github.workflow }}" && workflow_run.status !== "in_progress") {
-              console.log(`Deleting artifacts from workflow run ${workflow_run.id}`)
-              const response = await github.request(`GET /repos/$/actions/runs/${workflow_run.id}/artifacts`)
-              for (artifact of response.data.artifacts) {
-                console.log(`Deleting artifact with id ${artifact.id}`)
-                const deleteResponse = await github.request(`DELETE /repos/$/actions/artifacts/${artifact.id}`)
+      - name: Build vyos-build Docker image
+        id: build-docker
+        run: |
+          git clone -b current --single-branch https://github.com/vyos/vyos-build.git
+          cd vyos-build
+          docker build -t vyos-builder docker
+        continue-on-error: false
+
+      - name: Build ISO
+        id: build-iso
+        if: steps.build-docker.outcome == 'success' && !cancelled()
+        run: |
+          cd vyos-build
+          docker run --rm --privileged -v $(pwd):/vyos -w /vyos vyos/vyos-build:current bash -c 'os=buster64 branch=current sudo make iso'
+          echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
+      - name: Check space usage
+        if: always()
+        run: df -hT
+
+      - name: Delete old artifacts
+        if: env.DELETE_OLD_WORKFLOWS == 'true'
+        uses: actions/github-script@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const runsResponse = await github.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            for (const workflow_run of runsResponse.data.workflow_runs) {
+              if (workflow_run.name === '${{ github.workflow }}' && workflow_run.status !== 'in_progress') {
+                console.log(`Deleting artifacts from workflow run ${workflow_run.id}`);
+                const artifacts = await github.actions.listWorkflowRunArtifacts({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: workflow_run.id,
+                });
+                for (const artifact of artifacts.data.artifacts) {
+                  console.log(`Deleting artifact with id ${artifact.id}`);
+                  await github.actions.deleteArtifact({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    artifact_id: artifact.id,
+                  });
+                }
               }
             }
-          }
-      run: echo "::set-output name=status::success"
- 
-    - name: Persist created iso
-      id: upload-artifact
-      uses: actions/upload-artifact@main
-      if: steps.delete-artifacts.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
-      id: check-usage
-      if: steps.build-iso.conclusion == 'success' && (!cancelled())
-      run: |
-        pwd; ls -al
-        df -hT
-        echo "ACTIONS_RUNNER_DEBUG=true" >> "$GITHUB_ENV"
-        echo "ACTIONS_STEP_DEBUG=true" >> "$GITHUB_ENV"
- 
-    - name: Persist created iso
-      id: persist-iso
-      uses: actions/upload-artifact@main
-      if: steps.check-usage.conclusion == 'success' && env.UPLOAD_BIN_DIR == 'true' && !cancelled()
-      with:
-        name: vyos-lts_${{ env.FILE_DATE }}
-        path: 'vyos-build/build/live-image-amd64.hybrid.iso'
-      run: echo "::set-output name=status::success"
 
-    - name: Generate release tag
-      id: tag
-      if: steps.upload-artifact.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
-      run: |
-        echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
-        touch release.txt
-        [ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
-        [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-        echo "::set-output name=status::success"
-      if: steps.persist-iso.conclusion == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
-      run: >
-          echo "RELEASE_TAG=_$(date +"%Y.%m.%d-%H%M")" >> "$GITHUB_ENV"
+      - name: Upload ISO as artifact
+        if: steps.build-iso.outcome == 'success' && env.UPLOAD_BIN_DIR == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: vyos-lts_${{ env.FILE_DATE }}
+          path: vyos-build/build/live-image-amd64.hybrid.iso
 
-          touch release.txt
+      - name: Generate release tag
+        id: generate-tag
+        if: steps.upload-artifact.outcome == 'success' && env.UPLOAD_RELEASE == 'true'
+        run: |
+          echo "::set-output name=release_tag::$(date +'%Y.%m.%d-%H%M')"
 
-          #[ $UPLOAD_COWTRANSFER = true ] && echo "🔗 [Cowtransfer](${{ steps.cowtransfer.outputs.url }})" >> release.txt
+      - name: Upload firmware to release
+        if: steps.generate-tag.outcome == 'success' && env.UPLOAD_RELEASE == 'true'
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.generate-tag.outputs.release_tag }}
+          files: vyos-build/build/*
 
-          #[ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
+      - name: Delete old workflow runs
+        if: env.DELETE_OLD_WORKFLOWS == 'true'
+        uses: GitRML/delete-workflow-runs@v1
+        with:
+          retain_days: 1
+          keep_minimum_runs: 3
 
-    - name: Upload firmware to release
-      id: upload-release
-      uses: softprops/action-gh-release@v1
-      if:  steps.tag.outputs.status == 'success' && !cancelled()
-      if: (!cancelled()) && steps.tag.conclusion == 'success' && env.UPLOAD_RELEASE == 'true'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        # tag_name: ${{ steps.tag.outputs.release_tag }}
-        tag_name: ${{ env.RELEASE_TAG }}
-        body_path: release.txt
-        files: vyos-build/build/*
-
-    - name: Delete workflow runs
-      id: delete-workflows
-      uses: GitRML/delete-workflow-runs@main
-      if: (!cancelled()) && steps.upload-release.conclusion == 'success' && env.DELETE_OLD_WORKFLOWS == 'true'
-      with:
-        retain_days: 1
-        keep_minimum_runs: 3
-
-    - name: Remove old Releases
-      id: delete-releases
-      uses: dev-drprasad/delete-older-releases@v0.1.0
-      if: (!cancelled()) && steps.delete-workflows.conclusion == 'success' && env.DELETE_OLD_RELEASES == 'true'
-      with:
-        keep_latest: 3
-        delete_tags: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   
+      - name: Remove old releases
+        if: env.DELETE_OLD_RELEASES == 'true'
+        uses: dev-drprasad/delete-older-releases@v0.1.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          keep_latest: 3
+          delete_tags: true
